@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoTransporte - GPS Móvil</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #2196F3;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .card {
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #eee;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .switch-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .switch-label {
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 34px;
+            background: #ccc;
+            border-radius: 34px;
+            cursor: pointer;
+            transition: background 0.3s;
+            border: none;
+            outline: none;
+        }
+
+        .toggle-switch.active {
+            background: #4CAF50;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            left: 28px;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .status.active {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .status.inactive {
+            background: #ffccbc;
+            color: #d84315;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #999;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #2196F3;
+            font-weight: 600;
+            text-align: right;
+            flex: 1;
+            margin-left: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            padding: 15px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            border-left: 4px solid #c62828;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #0d47a1;
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: #1565c0;
+        }
+
+        .truck-id {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>📍 GeoTransporte</h1>
+            <p>Sistema de Rastreo GPS en Vivo</p>
+        </div>
+
+        <!-- TRUCK ID -->
+        <div class="truck-id" id="truckIdDisplay">Camión: camion_001</div>
+
+        <!-- ERROR MESSAGE -->
+        <div class="error hidden" id="errorBox"></div>
+
+        <!-- CONTROL CARD -->
+        <div class="card">
+            <div class="card-title">Control de GPS</div>
+            <div class="switch-container">
+                <span class="switch-label">Estado:</span>
+                <button class="toggle-switch" id="gpsToggle" onclick="toggleGPS()"></button>
+            </div>
+            <div class="status inactive" id="status">⚫ INACTIVO</div>
+        </div>
+
+        <!-- LOCATION CARD -->
+        <div class="card hidden" id="locationCard">
+            <div class="card-title">Ubicación Actual</div>
+            
+            <div class="info-row">
+                <span class="info-label">Latitud:</span>
+                <span class="info-value" id="latitude">-</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Longitud:</span>
+                <span class="info-value" id="longitude">-</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Precisión:</span>
+                <span class="info-value" id="accuracy">-</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Velocidad:</span>
+                <span class="info-value" id="speed">-</span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Actualizado:</span>
+                <span class="info-value" id="timestamp">-</span>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div class="loading hidden" id="loadingBox">
+            <div class="spinner"></div>
+            Iniciando GPS...
+        </div>
+
+        <!-- INFO BOX -->
+        <div class="info-box">
+            <strong>ℹ️ Información</strong><br>
+            • Los datos se envían automáticamente a Firebase<br>
+            • Se actualiza cada 5 segundos<br>
+            • Puedes controlar desde tu panel web<br>
+            • Mantén esta página abierta
+        </div>
+    </div>
+
+    <script>
+        // 🔥 CONFIGURACIÓN FIREBASE (TU CONFIGURACIÓN)
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyAGrr4GDKcqfj0u8c2bhhdpvDroo8G3ges",
+            authDomain: "geotransporte-d31a0.firebaseapp.com",
+            projectId: "geotransporte-d31a0",
+            storageBucket: "geotransporte-d31a0.firebasestorage.app",
+            messagingSenderId: "107029552584",
+            databaseURL: "https://geotransporte-d31a0-default-rtdb.firebaseio.com",
+            appId: "1:107029552584:web:072565d6e54d2b12e58e41"
+        };
+
+        // Inicializar Firebase
+        const app = firebase.initializeApp(FIREBASE_CONFIG);
+        const database = firebase.database();
+
+        // 🚛 ID DEL CAMIÓN
+        const TRUCK_ID = 'camion_001';
+
+        // Estado
+        let gpsActive = false;
+        let locationWatch = null;
+
+        // Elementos DOM
+        const gpsToggle = document.getElementById('gpsToggle');
+        const status = document.getElementById('status');
+        const locationCard = document.getElementById('locationCard');
+        const loadingBox = document.getElementById('loadingBox');
+        const errorBox = document.getElementById('errorBox');
+        const truckIdDisplay = document.getElementById('truckIdDisplay');
+
+        // Mostrar ID del camión
+        truckIdDisplay.textContent = `Camión: ${TRUCK_ID}`;
+
+        // 📍 Solicitar permisos de ubicación al cargar
+        window.addEventListener('load', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    () => {
+                        console.log('GPS disponible');
+                    },
+                    (error) => {
+                        showError('Permiso de ubicación denegado. Habilita GPS en tu teléfono.');
+                    }
+                );
+            }
+        });
+
+        // 🎛️ Alternar GPS
+        function toggleGPS() {
+            gpsActive = !gpsActive;
+            updateUI();
+
+            if (gpsActive) {
+                startGPS();
+            } else {
+                stopGPS();
+            }
+
+            // Actualizar en Firebase
+            database.ref(`trucks/${TRUCK_ID}/gps_active`).set(gpsActive);
+        }
+
+        // 🟢 Iniciar GPS
+        function startGPS() {
+            loadingBox.classList.remove('hidden');
+
+            if (navigator.geolocation) {
+                // Obtener ubicación inicial
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        updateLocation(position.coords);
+                        loadingBox.classList.add('hidden');
+                    },
+                    (error) => {
+                        showError('Error al obtener ubicación: ' + error.message);
+                        gpsActive = false;
+                        updateUI();
+                        loadingBox.classList.add('hidden');
+                    }
+                );
+
+                // Monitorear cambios de ubicación
+                locationWatch = navigator.geolocation.watchPosition(
+                    (position) => {
+                        updateLocation(position.coords);
+                    },
+                    (error) => {
+                        console.error('Error en watchPosition:', error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                showError('Geolocalización no disponible en tu navegador');
+                gpsActive = false;
+                updateUI();
+            }
+        }
+
+        // 🔴 Detener GPS
+        function stopGPS() {
+            if (locationWatch !== null) {
+                navigator.geolocation.clearWatch(locationWatch);
+                locationWatch = null;
+            }
+            locationCard.classList.add('hidden');
+        }
+
+        // 📍 Actualizar ubicación
+        function updateLocation(coords) {
+            const lat = coords.latitude.toFixed(6);
+            const lng = coords.longitude.toFixed(6);
+            const acc = Math.round(coords.accuracy);
+            const spd = coords.speed ? (coords.speed * 3.6).toFixed(1) : '0';
+            const now = new Date().toLocaleTimeString('es-PE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            // Actualizar UI
+            document.getElementById('latitude').textContent = lat;
+            document.getElementById('longitude').textContent = lng;
+            document.getElementById('accuracy').textContent = acc + ' m';
+            document.getElementById('speed').textContent = spd + ' km/h';
+            document.getElementById('timestamp').textContent = now;
+            locationCard.classList.remove('hidden');
+
+            // Enviar a Firebase
+            database.ref(`trucks/${TRUCK_ID}`).set({
+                id: TRUCK_ID,
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                accuracy: acc,
+                speed: parseFloat(spd),
+                timestamp: new Date().toISOString(),
+                gps_active: true,
+                lastUpdate: now
+            }).catch(err => console.error('Error en Firebase:', err));
+        }
+
+        // 🎨 Actualizar UI
+        function updateUI() {
+            if (gpsActive) {
+                gpsToggle.classList.add('active');
+                status.classList.remove('inactive');
+                status.classList.add('active');
+                status.textContent = '🔴 GRABANDO';
+            } else {
+                gpsToggle.classList.remove('active');
+                status.classList.remove('active');
+                status.classList.add('inactive');
+                status.textContent = '⚫ INACTIVO';
+            }
+        }
+
+        // ⚠️ Mostrar error
+        function showError(message) {
+            errorBox.textContent = '⚠️ ' + message;
+            errorBox.classList.remove('hidden');
+            setTimeout(() => {
+                errorBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        // 🎧 Escuchar comandos remotos (desde panel web)
+        database.ref(`trucks/${TRUCK_ID}/gps_active`).on('value', (snapshot) => {
+            if (snapshot.exists()) {
+                const remoteState = snapshot.val();
+                if (remoteState !== gpsActive) {
+                    gpsActive = remoteState;
+                    updateUI();
+
+                    if (gpsActive) {
+                        startGPS();
+                    } else {
+                        stopGPS();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
